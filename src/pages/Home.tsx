@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import ProductCard from '../components/ProductCard';
 import { Product, Banner } from '../types';
+import { supabase } from '../lib/supabase';
 import { ChevronLeft, ChevronRight, ArrowRight, Truck, PhoneCall, RotateCcw, ShieldCheck, Printer, Palette, Clock, PenTool, MessageCircle, Globe, Headphones } from 'lucide-react';
 
 export default function Home() {
@@ -16,21 +17,105 @@ export default function Home() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Fetch banners
-        const bannersRes = await fetch('/api/banners');
-        if (bannersRes.ok) {
-          const bannersData = await bannersRes.json();
-          setBanners(bannersData);
+        let loadedBanners: Banner[] = [];
+        let loadedProducts: Product[] = [];
+
+        // 1. Try Local API Banners
+        try {
+          const bannersRes = await fetch('/api/banners');
+          if (bannersRes.ok) {
+            loadedBanners = await bannersRes.json();
+          }
+        } catch (e) {
+          console.warn('API /api/banners unavailable, falling back to Supabase Cloud');
         }
 
-        // Fetch products
-        const productsRes = await fetch('/api/products');
-        if (productsRes.ok) {
-          const productsData = await productsRes.json() as Product[];
-          // Filter featured
-          setFeaturedProducts(productsData.filter(p => p.featured && p.status === 'active').slice(0, 4));
-          // Filter new arrivals
-          setNewArrivals(productsData.filter(p => p.isNewArrival && p.status === 'active').slice(0, 4));
+        // Supabase Direct Banners Fallback if API returned empty/failed
+        if (!loadedBanners || loadedBanners.length === 0) {
+          try {
+            const { data: bData } = await supabase.from('banners').select('*').order('created_at', { ascending: false });
+            if (bData && bData.length > 0) {
+              loadedBanners = bData.map((b: any) => ({
+                id: String(b.id),
+                title: b.title || 'STREET ACCENTS DTF PRINTING',
+                subtitle: b.subtitle || 'PROFESSIONAL HEAT PRESS. PERFECT RESULTS EVERY TIME!',
+                image: b.image || 'https://kpjwjkqxyfhkyzfiadqs.supabase.co/storage/v1/object/public/banners/hero-bg.png',
+                linkUrl: b.link_url || b.linkUrl || b.link || '/shop',
+                buttonText: b.button_text || b.buttonText || 'Shop Now',
+                sortOrder: b.sort_order || b.sortOrder || 1,
+                status: b.status || 'active',
+                createdAt: b.created_at || b.createdAt || new Date().toISOString()
+              }));
+            }
+          } catch (sbErr) {
+            console.error('Supabase banner query failed:', sbErr);
+          }
+        }
+
+        // Default Fallback Banner if DB is empty
+        if (!loadedBanners || loadedBanners.length === 0) {
+          loadedBanners = [{
+            id: '1',
+            title: 'STREET ACCENTS DTF PRINTING',
+            subtitle: 'PROFESSIONAL HEAT PRESS. PERFECT RESULTS EVERY TIME!',
+            image: 'https://kpjwjkqxyfhkyzfiadqs.supabase.co/storage/v1/object/public/banners/hero-bg.png',
+            linkUrl: '/shop',
+            buttonText: 'EXPLORE COLLECTION',
+            sortOrder: 1,
+            status: 'active',
+            createdAt: new Date().toISOString()
+          }];
+        }
+        setBanners(loadedBanners);
+
+        // 2. Try Local API Products
+        try {
+          const productsRes = await fetch('/api/products');
+          if (productsRes.ok) {
+            loadedProducts = await productsRes.json();
+          }
+        } catch (e) {
+          console.warn('API /api/products unavailable, falling back to Supabase Cloud');
+        }
+
+        // Supabase Direct Products Fallback if API returned empty/failed
+        if (!loadedProducts || loadedProducts.length === 0) {
+          try {
+            const { data: pData } = await supabase.from('products').select('*');
+            if (pData && pData.length > 0) {
+              loadedProducts = pData.map((p: any) => ({
+                id: String(p.id),
+                categoryId: String(p.category_id || p.categoryId || '1'),
+                name: p.name,
+                slug: p.slug || p.name.toLowerCase().replace(/\s+/g, '-'),
+                sku: p.sku || `SKU-${p.id}`,
+                description: p.description || '',
+                price: Number(p.price),
+                salePrice: p.sale_price ? Number(p.sale_price) : (p.original_price ? Number(p.original_price) : undefined),
+                sizes: Array.isArray(p.sizes) ? p.sizes : ['S', 'M', 'L', 'XL', '2XL'],
+                colors: Array.isArray(p.colors) ? p.colors : [{ name: 'Black', hex: '#111' }, { name: 'White', hex: '#fff' }],
+                stockQuantity: p.stock_quantity ?? p.stockQuantity ?? 10,
+                mainImage: p.main_image || p.mainImage || (Array.isArray(p.images) ? p.images[0] : p.image) || '',
+                galleryImages: Array.isArray(p.gallery_images) ? p.gallery_images : (Array.isArray(p.images) ? p.images : []),
+                featured: p.featured ?? false,
+                isNewArrival: p.is_new_arrival ?? p.isNewArrival ?? false,
+                views: p.views || 0,
+                status: p.status || 'active',
+                createdAt: p.created_at || p.createdAt || new Date().toISOString()
+              }));
+            }
+          } catch (sbErr) {
+            console.error('Supabase product query failed:', sbErr);
+          }
+        }
+
+        if (loadedProducts && loadedProducts.length > 0) {
+          const activeProds = loadedProducts.filter(p => p.status === 'active');
+          const featured = activeProds.filter(p => p.featured);
+          const newProds = activeProds.filter(p => p.isNewArrival);
+
+          setFeaturedProducts(featured.length > 0 ? featured.slice(0, 4) : activeProds.slice(0, 4));
+          setNewArrivals(newProds.length > 0 ? newProds.slice(0, 4) : activeProds.slice(0, 4));
         }
       } catch (err) {
         console.error('Error fetching home page data:', err);

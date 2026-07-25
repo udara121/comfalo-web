@@ -1,0 +1,6 @@
+{
+  "name": "Comfalo",
+  "description": "Modern Sri Lankan clothing brand e-commerce storefront, customer account dashboard, and full admin management panel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

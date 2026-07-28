@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Product, Order, Category, Banner, SiteSettings, User } from '../types';
 import { supabase } from '../lib/supabase';
+import { INITIAL_PRODUCTS, INITIAL_CATEGORIES, INITIAL_BANNERS, INITIAL_SETTINGS } from '../data/initialData';
 import { 
   ShieldCheck, ShoppingBag, TrendingUp, AlertTriangle, Users, FileText, Settings, 
   Image, Plus, Edit, Trash2, Check, X, Search, ChevronDown, ChevronRight, Eye, 
@@ -171,42 +172,92 @@ export default function Admin() {
       const headers = { 'x-user-id': user?.id || 'user-admin' };
 
       if (activeTab === 'dashboard' || activeTab === 'orders') {
-        const res = await fetch('/api/admin/orders', { headers });
-        if (res.ok) setOrders(await res.json());
+        try {
+          const res = await fetch('/api/admin/orders', { headers });
+          if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
+            const data = await res.json();
+            setOrders(Array.isArray(data) ? data : []);
+          }
+        } catch (e) {
+          console.warn('Orders fetch warning:', e);
+        }
       }
       
       if (activeTab === 'dashboard' || activeTab === 'products') {
-        const res = await fetch('/api/admin/products', { headers });
-        if (res.ok) setProducts(await res.json());
+        let loaded = false;
+        try {
+          const res = await fetch('/api/admin/products', { headers });
+          if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) {
+              setProducts(data);
+              loaded = true;
+            }
+          }
+        } catch (e) {
+          console.warn('Products fetch warning:', e);
+        }
+        if (!loaded) setProducts(INITIAL_PRODUCTS);
       }
 
       if (activeTab === 'products' || activeTab === 'categories') {
-        const res = await fetch('/api/admin/categories', { headers });
-        if (res.ok) setCategories(await res.json());
+        let loaded = false;
+        try {
+          const res = await fetch('/api/admin/categories', { headers });
+          if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) {
+              setCategories(data);
+              loaded = true;
+            }
+          }
+        } catch (e) {
+          console.warn('Categories fetch warning:', e);
+        }
+        if (!loaded) setCategories(INITIAL_CATEGORIES);
       }
 
       if (activeTab === 'banners') {
-        const res = await fetch('/api/admin/banners', { headers });
-        if (res.ok) setBanners(await res.json());
+        let loaded = false;
+        try {
+          const res = await fetch('/api/admin/banners', { headers });
+          if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) {
+              setBanners(data);
+              loaded = true;
+            }
+          }
+        } catch (e) {
+          console.warn('Banners fetch warning:', e);
+        }
+        if (!loaded) setBanners(INITIAL_BANNERS);
       }
 
       if (activeTab === 'customers') {
-        const res = await fetch('/api/admin/customers', { headers });
-        if (res.ok) setCustomers(await res.json());
+        try {
+          const res = await fetch('/api/admin/customers', { headers });
+          if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
+            setCustomers(await res.json());
+          }
+        } catch (e) {
+          console.warn('Customers fetch warning:', e);
+        }
       }
 
-      if (activeTab === 'settings' && settings) {
-        setSetSiteName(settings.siteName);
-        setSetSiteTag(settings.siteTagline);
-        setSetEmail(settings.contactEmail);
-        setSetPhone(settings.contactPhone);
-        setSetWhatsapp(settings.whatsappNumber);
-        setSetColFee(String(settings.deliveryFeeColombo));
-        setSetOutFee(String(settings.deliveryFeeOutstation));
-        setSetThreshold(String(settings.freeDeliveryThreshold));
-        setSetFb(settings.facebookUrl);
-        setSetIg(settings.instagramUrl);
-        setSetTt(settings.tiktokUrl);
+      if (activeTab === 'settings') {
+        const s = settings || INITIAL_SETTINGS;
+        setSetSiteName(s.siteName);
+        setSetSiteTag(s.siteTagline);
+        setSetEmail(s.contactEmail);
+        setSetPhone(s.contactPhone);
+        setSetWhatsapp(s.whatsappNumber);
+        setSetColFee(String(s.deliveryFeeColombo));
+        setSetOutFee(String(s.deliveryFeeOutstation));
+        setSetThreshold(String(s.freeDeliveryThreshold));
+        setSetFb(s.facebookUrl);
+        setSetIg(s.instagramUrl);
+        setSetTt(s.tiktokUrl);
       }
 
     } catch (e) {

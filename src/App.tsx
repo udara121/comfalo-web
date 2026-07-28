@@ -13,6 +13,8 @@ import OrderTrack from './pages/OrderTrack';
 import Account from './pages/Account';
 import Admin from './pages/Admin';
 
+import Logo from './components/Logo';
+
 export default function App() {
   const { currentPath, loadingSettings } = useApp();
 
@@ -20,8 +22,14 @@ export default function App() {
   const renderPage = () => {
     if (loadingSettings) {
       return (
-        <div className="flex items-center justify-center min-h-[60vh] font-mono text-[11px] tracking-widest text-gray-400 uppercase">
-          CALIBRATING COMFALO ENGINE...
+        <div className="flex flex-col items-center justify-center min-h-[70vh] bg-[#FAFAFA] font-sans">
+          <div className="animate-pulse flex flex-col items-center">
+            <Logo size="lg" showText={true} />
+            <div className="w-16 h-1 bg-gradient-to-r from-[#FF6B00] to-[#111111] rounded-full mt-6 animate-pulse"></div>
+            <span className="text-[10px] font-bold tracking-[0.3em] text-gray-400 uppercase mt-4">
+              LOADING COMFALO...
+            </span>
+          </div>
         </div>
       );
     }

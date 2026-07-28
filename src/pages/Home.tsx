@@ -282,8 +282,8 @@ export default function Home() {
 
                     </div>
 
-                    {/* FLOATING HEAT PRESS GLASS BADGE (Mobile Centered & Desktop Right Edge) */}
-                    <div className="absolute top-4 left-1/2 -translate-x-1/2 sm:translate-x-0 sm:left-auto sm:top-[15%] right-auto sm:right-6 md:right-8 lg:right-10 z-30 bg-[#111111]/90 backdrop-blur-xl border-2 rounded-2xl p-3 sm:p-4 md:p-5 shadow-2xl animate-continuousPop text-center min-w-[170px] sm:min-w-[210px] md:min-w-[240px] pointer-events-auto hover:scale-110 transition-transform">
+                    {/* FLOATING HEAT PRESS GLASS BADGE (Desktop Only - Hidden on Mobile) */}
+                    <div className="hidden sm:block absolute top-4 left-1/2 -translate-x-1/2 sm:translate-x-0 sm:left-auto sm:top-[15%] right-auto sm:right-6 md:right-8 lg:right-10 z-30 bg-[#111111]/90 backdrop-blur-xl border-2 rounded-2xl p-3 sm:p-4 md:p-5 shadow-2xl animate-continuousPop text-center min-w-[170px] sm:min-w-[210px] md:min-w-[240px] pointer-events-auto hover:scale-110 transition-transform">
                       <span className="block text-[10px] sm:text-xs font-black tracking-[0.2em] text-gray-300 uppercase">PROFESSIONAL</span>
                       <span className="block text-lg sm:text-xl md:text-2xl font-black text-orange-500 uppercase tracking-wider my-0.5 animate-pulse drop-shadow-md">HEAT PRESS</span>
                       <span className="block text-[9px] sm:text-[10px] font-bold text-gray-200 uppercase tracking-widest leading-tight">PERFECT RESULTS</span>
@@ -339,77 +339,59 @@ export default function Home() {
           })
         )}
 
-        {/* Carousel Slide controls */}
+        {/* Carousel Slide controls (Hidden per user request) */}
         {banners.length > 1 && (
-          <>
-            <button
-              onClick={handlePrevSlide}
-              className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-white/10 hover:bg-white text-white hover:text-black p-3 rounded-none transition-all duration-200 cursor-pointer"
-              aria-label="Previous slide"
-            >
-              <ChevronLeft size={20} />
-            </button>
-            <button
-              onClick={handleNextSlide}
-              className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-white/10 hover:bg-white text-white hover:text-black p-3 rounded-none transition-all duration-200 cursor-pointer"
-              aria-label="Next slide"
-            >
-              <ChevronRight size={20} />
-            </button>
-
-            {/* Slide dots indicators */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2.5">
-              {banners.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setCurrentSlide(idx)}
-                  className={`w-2 h-2 rounded-none transition-all duration-300 ${idx === currentSlide ? 'w-8 bg-[#FF6B00]' : 'bg-white/40'
-                    }`}
-                  aria-label={`Go to slide ${idx + 1}`}
-                />
-              ))}
-            </div>
-          </>
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2.5">
+            {banners.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentSlide(idx)}
+                className={`w-2 h-2 rounded-none transition-all duration-300 ${idx === currentSlide ? 'w-8 bg-[#FF6B00]' : 'bg-white/40'
+                  }`}
+                aria-label={`Go to slide ${idx + 1}`}
+              />
+            ))}
+          </div>
         )}
       </section>
 
-      {/* 2. Announcement Promo Info Grid */}
-      <section className="bg-white py-6 border-b border-gray-100" id="announcements-grid">
-        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-6 text-center divide-y md:divide-y-0 md:divide-x divide-gray-100">
-          <div className="py-2 flex flex-col items-center">
-            <Truck size={20} className="text-[#FF6B00] mb-2" />
-            <span className="text-[10px] font-bold tracking-widest uppercase text-gray-900">
+      {/* 2. Announcement Promo Info Grid - 4 Columns Horizontal on Mobile & PC */}
+      <section className="bg-white py-3 sm:py-6 border-b border-gray-100" id="announcements-grid">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 grid grid-cols-4 gap-1 sm:gap-4 md:gap-6 text-center divide-x divide-gray-200/60">
+          <div className="py-1 px-0.5 sm:px-2 flex flex-col items-center justify-center">
+            <Truck className="text-[#FF6B00] mb-1 w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+            <span className="text-[8px] sm:text-[10px] md:text-xs font-bold tracking-tight sm:tracking-widest uppercase text-gray-900 leading-tight">
               Islandwide Delivery
             </span>
-            <span className="text-[9px] text-gray-400 uppercase tracking-wider mt-0.5">
+            <span className="hidden sm:block text-[8px] sm:text-[9px] text-gray-400 uppercase tracking-wider mt-0.5">
               Cash on delivery in 2-4 days
             </span>
           </div>
-          <div className="py-2 pt-4 md:pt-2 flex flex-col items-center">
-            <RotateCcw size={20} className="text-[#FF6B00] mb-2" />
-            <span className="text-[10px] font-bold tracking-widest uppercase text-gray-900">
+          <div className="py-1 px-0.5 sm:px-2 flex flex-col items-center justify-center">
+            <RotateCcw className="text-[#FF6B00] mb-1 w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+            <span className="text-[8px] sm:text-[10px] md:text-xs font-bold tracking-tight sm:tracking-widest uppercase text-gray-900 leading-tight">
               7-Day Exchanges
             </span>
-            <span className="text-[9px] text-gray-400 uppercase tracking-wider mt-0.5">
+            <span className="hidden sm:block text-[8px] sm:text-[9px] text-gray-400 uppercase tracking-wider mt-0.5">
               Hassle-free size swaps
             </span>
           </div>
-          <div className="py-2 pt-4 md:pt-2 flex flex-col items-center">
-            <ShieldCheck size={20} className="text-[#FF6B00] mb-2" />
-            <span className="text-[10px] font-bold tracking-widest uppercase text-gray-900">
-              Premium Heavyweight Cotton
+          <div className="py-1 px-0.5 sm:px-2 flex flex-col items-center justify-center">
+            <ShieldCheck className="text-[#FF6B00] mb-1 w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+            <span className="text-[8px] sm:text-[10px] md:text-xs font-bold tracking-tight sm:tracking-widest uppercase text-gray-900 leading-tight">
+              Heavyweight Cotton
             </span>
-            <span className="text-[9px] text-gray-400 uppercase tracking-wider mt-0.5">
+            <span className="hidden sm:block text-[8px] sm:text-[9px] text-gray-400 uppercase tracking-wider mt-0.5">
               Tailored comfort structures
             </span>
           </div>
-          <div className="py-2 pt-4 md:pt-2 flex flex-col items-center">
-            <PhoneCall size={20} className="text-[#FF6B00] mb-2" />
-            <span className="text-[10px] font-bold tracking-widest uppercase text-gray-900">
-              WhatsApp Ordering
+          <div className="py-1 px-0.5 sm:px-2 flex flex-col items-center justify-center">
+            <PhoneCall className="text-[#FF6B00] mb-1 w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+            <span className="text-[8px] sm:text-[10px] md:text-xs font-bold tracking-tight sm:tracking-widest uppercase text-gray-900 leading-tight">
+              WhatsApp Order
             </span>
-            <span className="text-[9px] text-gray-400 uppercase tracking-wider mt-0.5">
-              Quick cart-sharing checkout
+            <span className="hidden sm:block text-[8px] sm:text-[9px] text-gray-400 uppercase tracking-wider mt-0.5">
+              Quick cart checkout
             </span>
           </div>
         </div>

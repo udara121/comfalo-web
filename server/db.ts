@@ -611,6 +611,19 @@ export class DB {
         if (!this.data?.users || !this.data?.products) {
           throw new Error('Malformed database file');
         }
+        // Ensure critical seed arrays exist
+        if (!this.data.categories || this.data.categories.length === 0) {
+          this.data.categories = INITIAL_CATEGORIES;
+        }
+        if (!this.data.products || this.data.products.length === 0) {
+          this.data.products = INITIAL_PRODUCTS;
+        }
+        if (!this.data.banners || this.data.banners.length === 0) {
+          this.data.banners = INITIAL_BANNERS;
+        }
+        if (!this.data.settings) {
+          this.data.settings = INITIAL_SETTINGS;
+        }
       } else {
         this.seed();
       }

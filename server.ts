@@ -52,7 +52,27 @@ const PORT = 3000;
   });
 
   // Site Settings
-  app.get('/api/settings', (req, res) => {
+  app.get('/api/settings', async (req, res) => {
+    try {
+      const { data, error } = await supabase.from('settings').select('*').limit(1).maybeSingle();
+      if (!error && data) {
+        return res.json({
+          siteName: data.site_name,
+          siteTagline: data.site_tagline,
+          contactEmail: data.contact_email,
+          contactPhone: data.contact_phone,
+          whatsappNumber: data.whatsapp_number,
+          deliveryFeeColombo: Number(data.delivery_fee_colombo),
+          deliveryFeeOutstation: Number(data.delivery_fee_outstation),
+          freeDeliveryThreshold: Number(data.free_delivery_threshold),
+          facebookUrl: data.facebook_url,
+          instagramUrl: data.instagram_url,
+          tiktokUrl: data.tiktok_url
+        });
+      }
+    } catch (e) {
+      console.warn('Supabase settings fetch warning:', e);
+    }
     const db = DB.get();
     res.json(db.settings);
   });
@@ -65,7 +85,26 @@ const PORT = 3000;
   });
 
   // Banners
-  app.get('/api/banners', (req, res) => {
+  app.get('/api/banners', async (req, res) => {
+    try {
+      const { data, error } = await supabase.from('banners').select('*').eq('status', 'active').order('sort_order', { ascending: true });
+      if (!error && data && data.length > 0) {
+        const banners = data.map((b: any) => ({
+          id: b.id,
+          title: b.title,
+          subtitle: b.subtitle,
+          image: b.image,
+          linkUrl: b.link_url,
+          buttonText: b.button_text,
+          sortOrder: Number(b.sort_order) || 0,
+          status: b.status,
+          createdAt: b.created_at || new Date().toISOString()
+        }));
+        return res.json(banners);
+      }
+    } catch (e) {
+      console.warn('Supabase banners fetch warning:', e);
+    }
     const db = DB.get();
     const activeBanners = db.banners.filter(b => b.status === 'active');
     res.json(activeBanners);
@@ -183,7 +222,26 @@ const PORT = 3000;
   });
 
   // Categories
-  app.get('/api/categories', (req, res) => {
+  app.get('/api/categories', async (req, res) => {
+    try {
+      const { data, error } = await supabase.from('categories').select('*').order('sort_order', { ascending: true });
+      if (!error && data && data.length > 0) {
+        const categories = data.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          slug: c.slug,
+          description: c.description || '',
+          image: c.image || '',
+          parentId: c.parent_id || null,
+          sortOrder: Number(c.sort_order) || 0,
+          status: c.status || 'active',
+          createdAt: c.created_at || new Date().toISOString()
+        }));
+        return res.json(categories.filter((c: any) => c.status === 'active'));
+      }
+    } catch (e) {
+      console.warn('Supabase categories fetch warning:', e);
+    }
     const db = DB.get();
     const activeCategories = db.categories.filter(c => c.status === 'active');
     res.json(activeCategories);
@@ -304,10 +362,11 @@ const PORT = 3000;
       } else if (category === 'new-arrivals') {
         list = list.filter(p => p.isNewArrival);
       } else {
-        const catObj = DB.get().categories.find(c => c.slug === category);
-        if (catObj) {
-          list = list.filter(p => p.categoryId === catObj.id);
-        }
+        const db = DB.get();
+        const catObj = db.categories.find(c => c.slug.toLowerCase() === (category as string).toLowerCase() || c.id === category);
+        const targetId = catObj ? catObj.id : category;
+        const targetSlug = catObj ? catObj.slug : category;
+        list = list.filter(p => p.categoryId === targetId || p.categoryId === targetSlug);
       }
     }
 

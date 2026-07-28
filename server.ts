@@ -472,78 +472,98 @@ const PORT = 3000;
 
   // Products List (supports filtering and searching)
   app.get('/api/products', async (req, res) => {
-    const db = DB.get();
-    let list: Product[] = [...db.products.filter(p => p.status !== 'inactive')];
+    try {
+      const db = DB.get();
+      let list: Product[] = [...db.products.filter(p => p.status !== 'inactive')];
 
-    if (list.length === 0) {
-      try {
-        const { data, error } = await supabase.from('products').select('*').neq('status', 'inactive');
-        if (!error && data && data.length > 0) {
-          list = data.map(mapSupabaseProduct);
+      if (list.length === 0) {
+        try {
+          const { data, error } = await supabase.from('products').select('*').neq('status', 'inactive');
+          if (!error && data && data.length > 0) {
+            list = data.map(mapSupabaseProduct);
+          }
+        } catch (e) {
+          console.warn('Supabase products fetch warning:', e);
         }
-      } catch (e) {
-        console.warn('Supabase products fetch warning:', e);
       }
-    }
 
-    const { category, search, size, minPrice, maxPrice, sort } = req.query;
+      const { category, search, size, minPrice, maxPrice, sort } = req.query;
 
-    // Filter by Category
-    if (category) {
-      if (category === 'sale') {
-        list = list.filter(p => p.salePrice !== null && p.salePrice !== undefined);
-      } else if (category === 'new-arrivals') {
-        list = list.filter(p => p.isNewArrival);
+      // Filter by Category
+      if (category) {
+        const catLower = (category as string).toLowerCase().trim();
+        if (catLower === 'sale') {
+          list = list.filter(p => p.salePrice !== null && p.salePrice !== undefined);
+        } else if (catLower === 'new-arrivals') {
+          list = list.filter(p => p.isNewArrival);
+        } else if (catLower !== 'all') {
+          const catObj = db.categories.find(c => 
+            c.slug.toLowerCase() === catLower || 
+            c.id.toLowerCase() === catLower || 
+            c.id.toLowerCase() === `cat-${catLower}`
+          );
+          const targetId = catObj ? catObj.id.toLowerCase() : catLower;
+          const targetSlug = catObj ? catObj.slug.toLowerCase() : catLower;
+
+          list = list.filter(p => {
+            const pCat = (p.categoryId || '').toLowerCase();
+            return (
+              pCat === targetId ||
+              pCat === targetSlug ||
+              pCat === catLower ||
+              pCat === `cat-${catLower}` ||
+              pCat.replace('cat-', '') === catLower
+            );
+          });
+        }
+      }
+
+      // Search
+      if (search) {
+        const q = (search as string).toLowerCase();
+        list = list.filter(p => 
+          p.name.toLowerCase().includes(q) || 
+          p.sku.toLowerCase().includes(q) ||
+          p.description.toLowerCase().includes(q)
+        );
+      }
+
+      // Size filter
+      if (size) {
+        const s = size as string;
+        list = list.filter(p => p.sizes.includes(s));
+      }
+
+      // Price filters
+      if (minPrice) {
+        const min = Number(minPrice);
+        list = list.filter(p => (p.salePrice || p.price) >= min);
+      }
+      if (maxPrice) {
+        const max = Number(maxPrice);
+        list = list.filter(p => (p.salePrice || p.price) <= max);
+      }
+
+      // Sort
+      if (sort) {
+        if (sort === 'price-low') {
+          list.sort((a, b) => (a.salePrice || a.price) - (b.salePrice || b.price));
+        } else if (sort === 'price-high') {
+          list.sort((a, b) => (b.salePrice || b.price) - (a.salePrice || a.price));
+        } else if (sort === 'newest') {
+          list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        } else if (sort === 'popular') {
+          list.sort((a, b) => b.views - a.views);
+        }
       } else {
-        const catObj = db.categories.find(c => c.slug.toLowerCase() === (category as string).toLowerCase() || c.id === category);
-        const targetId = catObj ? catObj.id : category;
-        const targetSlug = catObj ? catObj.slug : category;
-        list = list.filter(p => p.categoryId === targetId || p.categoryId === targetSlug);
-      }
-    }
-
-    // Search
-    if (search) {
-      const q = (search as string).toLowerCase();
-      list = list.filter(p => 
-        p.name.toLowerCase().includes(q) || 
-        p.sku.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q)
-      );
-    }
-
-    // Size filter
-    if (size) {
-      const s = size as string;
-      list = list.filter(p => p.sizes.includes(s));
-    }
-
-    // Price filters
-    if (minPrice) {
-      const min = Number(minPrice);
-      list = list.filter(p => (p.salePrice || p.price) >= min);
-    }
-    if (maxPrice) {
-      const max = Number(maxPrice);
-      list = list.filter(p => (p.salePrice || p.price) <= max);
-    }
-
-    // Sort
-    if (sort) {
-      if (sort === 'price-low') {
-        list.sort((a, b) => (a.salePrice || a.price) - (b.salePrice || b.price));
-      } else if (sort === 'price-high') {
-        list.sort((a, b) => (b.salePrice || b.price) - (a.salePrice || a.price));
-      } else if (sort === 'newest') {
         list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      } else if (sort === 'popular') {
-        list.sort((a, b) => b.views - a.views);
       }
-    } else {
-      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    }
 
-    res.json(list);
+      res.json(list);
+    } catch (err: any) {
+      console.error('Error fetching products:', err);
+      res.status(500).json({ error: err?.message || 'Failed to fetch products' });
+    }
   });
 
   // Admin Products List

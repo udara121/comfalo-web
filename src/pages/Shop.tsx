@@ -69,12 +69,45 @@ export default function Shop() {
         const res = await fetch(url);
         if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
           const data = await res.json();
-          if (Array.isArray(data)) {
+          if (Array.isArray(data) && data.length > 0) {
             setProducts(data);
+            return;
           }
         }
+
+        // Fallback filter on INITIAL_PRODUCTS if API returns empty list or fails
+        let fallbackList = INITIAL_PRODUCTS;
+        if (selectedCategory && selectedCategory !== 'all') {
+          const catLower = selectedCategory.toLowerCase().trim();
+          if (catLower === 'sale') {
+            fallbackList = fallbackList.filter(p => p.salePrice !== null && p.salePrice !== undefined);
+          } else if (catLower === 'new-arrivals') {
+            fallbackList = fallbackList.filter(p => p.isNewArrival);
+          } else {
+            fallbackList = fallbackList.filter(p => {
+              const pCat = (p.categoryId || '').toLowerCase();
+              return pCat === catLower || pCat === `cat-${catLower}` || pCat.replace('cat-', '') === catLower;
+            });
+          }
+        }
+        setProducts(fallbackList);
       } catch (err) {
         console.error('Error fetching shop products:', err);
+        let fallbackList = INITIAL_PRODUCTS;
+        if (selectedCategory && selectedCategory !== 'all') {
+          const catLower = selectedCategory.toLowerCase().trim();
+          if (catLower === 'sale') {
+            fallbackList = fallbackList.filter(p => p.salePrice !== null && p.salePrice !== undefined);
+          } else if (catLower === 'new-arrivals') {
+            fallbackList = fallbackList.filter(p => p.isNewArrival);
+          } else {
+            fallbackList = fallbackList.filter(p => {
+              const pCat = (p.categoryId || '').toLowerCase();
+              return pCat === catLower || pCat === `cat-${catLower}` || pCat.replace('cat-', '') === catLower;
+            });
+          }
+        }
+        setProducts(fallbackList);
       } finally {
         setLoading(false);
       }

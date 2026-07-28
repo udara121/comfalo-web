@@ -1,17 +1,15 @@
 import express from 'express';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import { DB, hashPassword } from './server/db';
 import { User, Category, Product, Order, OrderItem, Banner, SiteSettings } from './src/types';
 import { supabase } from './src/lib/supabase';
 import { migrateLocalDbToSupabase } from './server/migrate';
 
-async function startServer() {
-  // Initialize local JSON DB
-  DB.init();
+// Initialize local JSON DB
+DB.init();
 
-  const app = express();
-  const PORT = 3000;
+export const app = express();
+const PORT = 3000;
 
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -809,26 +807,30 @@ async function startServer() {
     res.json({ message: `Customer status updated to ${customer.status}`, status: customer.status });
   });
 
-  // Static serving for build output and Vite Dev Middleware
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+// Static serving for build output and Vite Dev Middleware (Local Server Only)
+if (process.env.VERCEL !== '1' && !process.env.VERCEL_ENV) {
+  async function startLocalServer() {
+    if (process.env.NODE_ENV !== 'production') {
+      const { createServer: createViteServer } = await import('vite');
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    }
+
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on http://localhost:${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+  startLocalServer().catch(err => {
+    console.error('Failed to start Express backend:', err);
   });
 }
-
-startServer().catch(err => {
-  console.error('Failed to start Express backend:', err);
-});

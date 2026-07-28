@@ -481,36 +481,21 @@ export default function Admin() {
         responseData = await res.json();
       }
 
-      const newOrUpdatedProduct: Product = responseData?.id ? responseData : {
-        id: editingProductId || 'prod-' + Date.now(),
-        ...payload,
-        sizes,
-        colors,
-        views: 0,
-        status: payload.stockQuantity > 0 ? 'active' : 'out_of_stock',
-        createdAt: new Date().toISOString()
-      };
-
-      if (productFormMode === 'add') {
-        setProducts(prev => [newOrUpdatedProduct, ...prev]);
-      } else {
-        setProducts(prev => prev.map(p => p.id === editingProductId ? newOrUpdatedProduct : p));
+      if (!res.ok) {
+        throw new Error(responseData?.error || `Server returned status ${res.status}`);
       }
 
       showNotify('success', `Product ${productFormMode === 'add' ? 'created' : 'updated'} successfully!`);
       setShowProductForm(false);
+      await loadAdminData();
     } catch (err: any) {
-      console.warn('Product submit note:', err);
-      showNotify('success', `Product ${productFormMode === 'add' ? 'created' : 'updated'} successfully!`);
-      setShowProductForm(false);
+      console.error('Product submit error:', err);
+      showNotify('error', err.message || 'Failed to save product on server');
     }
   };
 
   const handleDeleteProduct = async (prodId: string) => {
     if (!window.confirm('Are you sure you want to permanently delete this product from the database?')) return;
-    
-    // Instantly remove from local UI state
-    setProducts(prev => prev.filter(p => p.id !== prodId));
 
     try {
       const res = await fetch(`/api/admin/products/${prodId}`, {
@@ -519,13 +504,15 @@ export default function Admin() {
       });
       if (res.ok) {
         showNotify('success', 'Product deleted permanently!');
+        await loadAdminData();
       } else {
-        showNotify('error', 'Delete failed on server.');
-        loadAdminData();
+        const data = await res.json();
+        showNotify('error', data.error || 'Delete failed on server.');
+        await loadAdminData();
       }
     } catch (err: any) {
       showNotify('error', 'Delete failed.');
-      loadAdminData();
+      await loadAdminData();
     }
   };
 
@@ -652,27 +639,15 @@ export default function Admin() {
         responseData = await res.json();
       }
 
-      const newOrUpdatedCat: Category = responseData?.id ? responseData : {
-        id: editingCatId || 'cat-' + Date.now(),
-        name: catName,
-        slug: catSlug.toLowerCase().trim().replace(/[\s_]+/g, '-'),
-        description: catDesc,
-        sortOrder: Number(catOrder),
-        status: catStatus as any,
-        createdAt: new Date().toISOString()
-      };
-
-      if (catFormMode === 'add') {
-        setCategories(prev => [...prev, newOrUpdatedCat]);
-      } else {
-        setCategories(prev => prev.map(c => c.id === editingCatId ? newOrUpdatedCat : c));
+      if (!res.ok) {
+        throw new Error(responseData?.error || `Server error (${res.status})`);
       }
 
       showNotify('success', `Category saved successfully`);
       setShowCategoryForm(false);
+      await loadAdminData();
     } catch (e: any) {
-      showNotify('success', `Category saved successfully`);
-      setShowCategoryForm(false);
+      showNotify('error', e.message || 'Failed to save category');
     }
   };
 
@@ -731,29 +706,15 @@ export default function Admin() {
         responseData = await res.json();
       }
 
-      const newOrUpdatedBanner: Banner = responseData?.id ? responseData : {
-        id: editingBannerId || 'ban-' + Date.now(),
-        title: banTitle,
-        subtitle: banSubtitle,
-        image: banImage,
-        linkUrl: banLink,
-        buttonText: banText,
-        sortOrder: Number(banOrder),
-        status: banStatus as any,
-        createdAt: new Date().toISOString()
-      };
-
-      if (bannerFormMode === 'add') {
-        setBanners(prev => [...prev, newOrUpdatedBanner]);
-      } else {
-        setBanners(prev => prev.map(b => b.id === editingBannerId ? newOrUpdatedBanner : b));
+      if (!res.ok) {
+        throw new Error(responseData?.error || `Server error (${res.status})`);
       }
 
       showNotify('success', `Banner slider updated`);
       setShowBannerForm(false);
+      await loadAdminData();
     } catch (e: any) {
-      showNotify('success', `Banner slider updated`);
-      setShowBannerForm(false);
+      showNotify('error', e.message || 'Failed updating banner');
     }
   };
 
@@ -766,7 +727,7 @@ export default function Admin() {
       });
       if (res.ok) {
         showNotify('success', 'Banner deleted successfully');
-        loadAdminData();
+        await loadAdminData();
       }
     } catch (e: any) {
       showNotify('error', 'Failed deleting banner');

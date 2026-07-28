@@ -69,27 +69,12 @@ export default function Shop() {
         const res = await fetch(url);
         if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
           const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
+          if (Array.isArray(data)) {
             setProducts(data);
-          } else {
-            let fallbackList = INITIAL_PRODUCTS;
-            if (selectedCategory && selectedCategory !== 'all') {
-              if (selectedCategory === 'sale') {
-                fallbackList = fallbackList.filter(p => p.salePrice !== null && p.salePrice !== undefined);
-              } else if (selectedCategory === 'new-arrivals') {
-                fallbackList = fallbackList.filter(p => p.isNewArrival);
-              } else {
-                fallbackList = fallbackList.filter(p => p.categoryId === selectedCategory || p.categoryId === `cat-${selectedCategory}` || p.slug === selectedCategory);
-              }
-            }
-            setProducts(fallbackList);
           }
-        } else {
-          setProducts(INITIAL_PRODUCTS);
         }
       } catch (err) {
         console.error('Error fetching shop products:', err);
-        setProducts(INITIAL_PRODUCTS);
       } finally {
         setLoading(false);
       }

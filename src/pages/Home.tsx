@@ -72,15 +72,15 @@ export default function Home() {
         // 2. Try Local API Products
         try {
           const productsRes = await fetch('/api/products');
-          if (productsRes.ok) {
+          if (productsRes.ok && productsRes.headers.get('content-type')?.includes('application/json')) {
             loadedProducts = await productsRes.json();
           }
         } catch (e) {
-          console.warn('API /api/products unavailable, falling back to Supabase Cloud');
+          console.warn('API /api/products fetch warning:', e);
         }
 
-        // Supabase Direct Products Fallback if API returned empty/failed
-        if (!loadedProducts || loadedProducts.length === 0) {
+        // Supabase Direct Products Fallback only if API failed completely (loadedProducts is null)
+        if (loadedProducts === null) {
           try {
             const { data: pData } = await supabase.from('products').select('*');
             if (pData && pData.length > 0) {
@@ -110,7 +110,7 @@ export default function Home() {
           }
         }
 
-        if (!loadedProducts || loadedProducts.length === 0) {
+        if (!loadedProducts) {
           loadedProducts = INITIAL_PRODUCTS;
         }
 

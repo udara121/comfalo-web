@@ -69,6 +69,10 @@ const PORT = 3000;
 
   // Site Settings
   app.get('/api/settings', async (req, res) => {
+    const db = DB.get();
+    if (db.settings) {
+      return res.json(db.settings);
+    }
     try {
       const { data, error } = await supabase.from('settings').select('*').limit(1).maybeSingle();
       if (!error && data) {
@@ -89,24 +93,48 @@ const PORT = 3000;
     } catch (e) {
       console.warn('Supabase settings fetch warning:', e);
     }
-    const db = DB.get();
     res.json(db.settings);
   });
 
-  app.put('/api/settings', requireAdmin, (req, res) => {
+  app.put('/api/settings', requireAdmin, async (req, res) => {
     const db = DB.get();
     db.settings = { ...db.settings, ...req.body };
     DB.save();
+
+    try {
+      await supabase.from('settings').upsert({
+        id: 1,
+        site_name: db.settings.siteName,
+        site_tagline: db.settings.siteTagline,
+        contact_email: db.settings.contactEmail,
+        contact_phone: db.settings.contactPhone,
+        whatsapp_number: db.settings.whatsappNumber,
+        delivery_fee_colombo: db.settings.deliveryFeeColombo,
+        delivery_fee_outstation: db.settings.deliveryFeeOutstation,
+        free_delivery_threshold: db.settings.freeDeliveryThreshold,
+        facebook_url: db.settings.facebookUrl,
+        instagram_url: db.settings.instagramUrl,
+        tiktok_url: db.settings.tiktokUrl
+      });
+    } catch (e) {
+      console.warn('Supabase settings sync warning:', e);
+    }
+
     res.json({ message: 'Settings updated successfully', settings: db.settings });
   });
 
   // Banners
   app.get('/api/banners', async (req, res) => {
+    const db = DB.get();
+    if (db.banners && db.banners.length > 0) {
+      const activeBanners = db.banners.filter(b => b.status === 'active');
+      return res.json(activeBanners);
+    }
     try {
       const { data, error } = await supabase.from('banners').select('*').eq('status', 'active').order('sort_order', { ascending: true });
       if (!error && data && data.length > 0) {
         const banners = data.map((b: any) => ({
-          id: b.id,
+          id: String(b.id),
           title: b.title,
           subtitle: b.subtitle,
           image: b.image,
@@ -121,9 +149,7 @@ const PORT = 3000;
     } catch (e) {
       console.warn('Supabase banners fetch warning:', e);
     }
-    const db = DB.get();
-    const activeBanners = db.banners.filter(b => b.status === 'active');
-    res.json(activeBanners);
+    res.json([]);
   });
 
   app.get('/api/admin/banners', requireAdmin, (req, res) => {
@@ -147,14 +173,42 @@ const PORT = 3000;
     db.banners.push(newBanner);
     db.banners.sort((a, b) => a.sortOrder - b.sortOrder);
     DB.save();
+
+    // Background sync to Supabase if connected
+    Promise.resolve(supabase.from('banners').upsert({
+      id: newBanner.id,
+      title: newBanner.title,
+      subtitle: newBanner.subtitle,
+      image: newBanner.image,
+      link_url: newBanner.linkUrl,
+      button_text: newBanner.buttonText,
+      sort_order: newBanner.sortOrder,
+      status: newBanner.status,
+      created_at: newBanner.createdAt
+    })).catch(() => {});
+
     res.status(201).json(newBanner);
   });
 
   app.put('/api/admin/banners/:id', requireAdmin, (req, res) => {
     const db = DB.get();
-    const index = db.banners.findIndex(b => b.id === req.params.id);
+    let index = db.banners.findIndex(b => String(b.id) === String(req.params.id));
     if (index === -1) {
-      return res.status(404).json({ error: 'Banner not found' });
+      const newBanner: Banner = {
+        id: req.params.id || 'banner-' + Date.now(),
+        title: req.body.title || '',
+        subtitle: req.body.subtitle || '',
+        image: req.body.image || 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=1600',
+        linkUrl: req.body.linkUrl || '/shop',
+        buttonText: req.body.buttonText || 'SHOP NOW',
+        sortOrder: Number(req.body.sortOrder) || 0,
+        status: req.body.status || 'active',
+        createdAt: new Date().toISOString(),
+      };
+      db.banners.push(newBanner);
+      db.banners.sort((a, b) => a.sortOrder - b.sortOrder);
+      DB.save();
+      return res.json(newBanner);
     }
     db.banners[index] = {
       ...db.banners[index],
@@ -162,17 +216,29 @@ const PORT = 3000;
     };
     db.banners.sort((a, b) => a.sortOrder - b.sortOrder);
     DB.save();
+
+    Promise.resolve(supabase.from('banners').upsert({
+      id: db.banners[index].id,
+      title: db.banners[index].title,
+      subtitle: db.banners[index].subtitle,
+      image: db.banners[index].image,
+      link_url: db.banners[index].linkUrl,
+      button_text: db.banners[index].buttonText,
+      sort_order: db.banners[index].sortOrder,
+      status: db.banners[index].status
+    })).catch(() => {});
+
     res.json(db.banners[index]);
   });
 
   app.delete('/api/admin/banners/:id', requireAdmin, (req, res) => {
     const db = DB.get();
-    const index = db.banners.findIndex(b => b.id === req.params.id);
-    if (index === -1) {
-      return res.status(404).json({ error: 'Banner not found' });
+    const index = db.banners.findIndex(b => String(b.id) === String(req.params.id));
+    if (index !== -1) {
+      db.banners.splice(index, 1);
+      DB.save();
     }
-    db.banners.splice(index, 1);
-    DB.save();
+    Promise.resolve(supabase.from('banners').delete().eq('id', req.params.id)).catch(() => {});
     res.json({ message: 'Banner deleted successfully' });
   });
 
@@ -239,11 +305,15 @@ const PORT = 3000;
 
   // Categories
   app.get('/api/categories', async (req, res) => {
+    const db = DB.get();
+    if (db.categories && db.categories.length > 0) {
+      return res.json(db.categories.filter(c => c.status === 'active'));
+    }
     try {
       const { data, error } = await supabase.from('categories').select('*').order('sort_order', { ascending: true });
       if (!error && data && data.length > 0) {
         const categories = data.map((c: any) => ({
-          id: c.id,
+          id: String(c.id),
           name: c.name,
           slug: c.slug,
           description: c.description || '',
@@ -258,9 +328,7 @@ const PORT = 3000;
     } catch (e) {
       console.warn('Supabase categories fetch warning:', e);
     }
-    const db = DB.get();
-    const activeCategories = db.categories.filter(c => c.status === 'active');
-    res.json(activeCategories);
+    res.json([]);
   });
 
   app.get('/api/admin/categories', requireAdmin, (req, res) => {
@@ -271,18 +339,14 @@ const PORT = 3000;
   app.post('/api/admin/categories', requireAdmin, (req, res) => {
     const db = DB.get();
     const { name, slug, description, image, parentId, sortOrder, status } = req.body;
-    if (!name || !slug) {
-      return res.status(400).json({ error: 'Name and slug are required' });
+    if (!name) {
+      return res.status(400).json({ error: 'Category name is required' });
     }
-    const exists = db.categories.some(c => c.slug === slug);
-    if (exists) {
-      return res.status(400).json({ error: 'Slug must be unique' });
-    }
-
+    const cleanSlug = (slug || name).toLowerCase().trim().replace(/[\s_]+/g, '-');
     const newCategory: Category = {
       id: 'cat-' + Date.now(),
       name,
-      slug,
+      slug: cleanSlug,
       description: description || '',
       image: image || '',
       parentId: parentId || null,
@@ -291,17 +355,49 @@ const PORT = 3000;
       createdAt: new Date().toISOString(),
     };
 
-    db.categories.push(newCategory);
+    // Replace if same slug exists or push
+    const existingIndex = db.categories.findIndex(c => c.slug === cleanSlug);
+    if (existingIndex !== -1) {
+      db.categories[existingIndex] = { ...db.categories[existingIndex], ...newCategory, id: db.categories[existingIndex].id };
+    } else {
+      db.categories.push(newCategory);
+    }
+
     db.categories.sort((a, b) => a.sortOrder - b.sortOrder);
     DB.save();
+
+    Promise.resolve(supabase.from('categories').upsert({
+      id: newCategory.id,
+      name: newCategory.name,
+      slug: newCategory.slug,
+      description: newCategory.description,
+      sort_order: newCategory.sortOrder,
+      status: newCategory.status,
+      created_at: newCategory.createdAt
+    })).catch(() => {});
+
     res.status(201).json(newCategory);
   });
 
   app.put('/api/admin/categories/:id', requireAdmin, (req, res) => {
     const db = DB.get();
-    const index = db.categories.findIndex(c => c.id === req.params.id);
+    let index = db.categories.findIndex(c => String(c.id) === String(req.params.id) || c.slug === req.params.id);
     if (index === -1) {
-      return res.status(404).json({ error: 'Category not found' });
+      const newCategory: Category = {
+        id: req.params.id || 'cat-' + Date.now(),
+        name: req.body.name || 'New Category',
+        slug: (req.body.slug || 'cat-' + Date.now()).toLowerCase().trim().replace(/[\s_]+/g, '-'),
+        description: req.body.description || '',
+        image: req.body.image || '',
+        parentId: req.body.parentId || null,
+        sortOrder: Number(req.body.sortOrder) || 0,
+        status: req.body.status || 'active',
+        createdAt: new Date().toISOString(),
+      };
+      db.categories.push(newCategory);
+      db.categories.sort((a, b) => a.sortOrder - b.sortOrder);
+      DB.save();
+      return res.json(newCategory);
     }
 
     db.categories[index] = {
@@ -310,6 +406,16 @@ const PORT = 3000;
     };
     db.categories.sort((a, b) => a.sortOrder - b.sortOrder);
     DB.save();
+
+    Promise.resolve(supabase.from('categories').upsert({
+      id: db.categories[index].id,
+      name: db.categories[index].name,
+      slug: db.categories[index].slug,
+      description: db.categories[index].description,
+      sort_order: db.categories[index].sortOrder,
+      status: db.categories[index].status
+    })).catch(() => {});
+
     res.json(db.categories[index]);
   });
 
@@ -354,19 +460,18 @@ const PORT = 3000;
 
   // Products List (supports filtering and searching)
   app.get('/api/products', async (req, res) => {
-    let list: Product[] = [];
-    try {
-      const { data, error } = await supabase.from('products').select('*').neq('status', 'inactive');
-      if (!error && data && data.length > 0) {
-        list = data.map(mapSupabaseProduct);
-      }
-    } catch (e) {
-      console.warn('Supabase products fetch warning:', e);
-    }
+    const db = DB.get();
+    let list: Product[] = [...db.products.filter(p => p.status !== 'inactive')];
 
     if (list.length === 0) {
-      const db = DB.get();
-      list = db.products.filter(p => p.status !== 'inactive');
+      try {
+        const { data, error } = await supabase.from('products').select('*').neq('status', 'inactive');
+        if (!error && data && data.length > 0) {
+          list = data.map(mapSupabaseProduct);
+        }
+      } catch (e) {
+        console.warn('Supabase products fetch warning:', e);
+      }
     }
 
     const { category, search, size, minPrice, maxPrice, sort } = req.query;
@@ -378,7 +483,6 @@ const PORT = 3000;
       } else if (category === 'new-arrivals') {
         list = list.filter(p => p.isNewArrival);
       } else {
-        const db = DB.get();
         const catObj = db.categories.find(c => c.slug.toLowerCase() === (category as string).toLowerCase() || c.id === category);
         const targetId = catObj ? catObj.id : category;
         const targetSlug = catObj ? catObj.slug : category;
@@ -424,15 +528,18 @@ const PORT = 3000;
         list.sort((a, b) => b.views - a.views);
       }
     } else {
-      // Default sort by newest
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
 
     res.json(list);
   });
 
-  // Admin Products List (Fetches directly from Supabase Cloud DB)
+  // Admin Products List
   app.get('/api/admin/products', requireAdmin, async (req, res) => {
+    const db = DB.get();
+    if (db.products && db.products.length > 0) {
+      return res.json(db.products);
+    }
     try {
       const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
       if (!error && data && data.length > 0) {
@@ -442,28 +549,30 @@ const PORT = 3000;
     } catch (e) {
       console.warn('Supabase admin products fetch warning:', e);
     }
-    const db = DB.get();
-    res.json(db.products);
+    res.json([]);
   });
 
   // Single product detail (by slug or ID)
   app.get('/api/products/:slug', async (req, res) => {
-    try {
-      const { data, error } = await supabase.from('products').select('*').or(`slug.eq.${req.params.slug},id.eq.${req.params.slug}`).limit(1).maybeSingle();
-      if (!error && data) {
-        return res.json(mapSupabaseProduct(data));
+    const db = DB.get();
+    const target = req.params.slug;
+    let product = db.products.find(p => p.slug === target || String(p.id) === String(target));
+    
+    if (!product) {
+      try {
+        const { data, error } = await supabase.from('products').select('*').or(`slug.eq.${target},id.eq.${target}`).limit(1).maybeSingle();
+        if (!error && data) {
+          product = mapSupabaseProduct(data);
+        }
+      } catch (e) {
+        console.warn('Supabase single product fetch warning:', e);
       }
-    } catch (e) {
-      console.warn('Supabase single product fetch warning:', e);
     }
 
-    const db = DB.get();
-    const product = db.products.find(p => p.slug === req.params.slug || p.id === req.params.slug);
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    // Increment view count dynamically!
     product.views = (product.views || 0) + 1;
     DB.save();
 
@@ -513,31 +622,37 @@ const PORT = 3000;
   app.post('/api/admin/products', requireAdmin, async (req, res) => {
     try {
       const db = DB.get();
-      const { name, slug, categoryId, sku, description, price, salePrice, sizes, colors, stockQuantity, mainImage, galleryImages, fabricDetails, careInstructions, featured, isNewArrival } = req.body;
+      let { name, slug, categoryId, sku, description, price, salePrice, sizes, colors, stockQuantity, mainImage, galleryImages, fabricDetails, careInstructions, featured, isNewArrival } = req.body;
 
-      if (!name || !slug || !categoryId || !price) {
-        return res.status(400).json({ error: 'Missing required fields' });
+      if (!name || price === undefined || price === null) {
+        return res.status(400).json({ error: 'Product name and price are required' });
       }
 
-      const exists = db.products.some(p => p.slug === slug);
-      if (exists) {
-        return res.status(400).json({ error: 'Slug must be unique' });
+      if (!slug) {
+        slug = name.toLowerCase().trim().replace(/[\s_]+/g, '-');
+      }
+
+      let uniqueSlug = slug.toLowerCase().trim().replace(/[\s_]+/g, '-');
+      let counter = 1;
+      while (db.products.some(p => p.slug === uniqueSlug)) {
+        uniqueSlug = `${slug}-${counter}`;
+        counter++;
       }
 
       const newProduct: Product = {
         id: 'prod-' + Date.now(),
-        categoryId,
+        categoryId: categoryId || (db.categories[0]?.id || 'cat-unisex'),
         name,
-        slug,
+        slug: uniqueSlug,
         sku: sku || 'CMF-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
         description: description || '',
         price: Number(price),
         salePrice: salePrice ? Number(salePrice) : null,
-        sizes: Array.isArray(sizes) ? sizes : ['S', 'M', 'L', 'XL'],
-        colors: Array.isArray(colors) ? colors : [{ name: 'Black', hex: '#111111' }],
+        sizes: Array.isArray(sizes) && sizes.length > 0 ? sizes : ['S', 'M', 'L', 'XL'],
+        colors: Array.isArray(colors) && colors.length > 0 ? colors : [{ name: 'Black', hex: '#111111' }],
         stockQuantity: Number(stockQuantity) || 0,
         mainImage: mainImage || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800',
-        galleryImages: Array.isArray(galleryImages) ? galleryImages : [mainImage],
+        galleryImages: Array.isArray(galleryImages) && galleryImages.length > 0 ? galleryImages : [mainImage || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800'],
         fabricDetails: fabricDetails || '',
         careInstructions: careInstructions || '',
         featured: !!featured,
@@ -547,10 +662,9 @@ const PORT = 3000;
         createdAt: new Date().toISOString(),
       };
 
-      db.products.push(newProduct);
+      db.products.unshift(newProduct);
       DB.save();
 
-      // Live Sync with Supabase Cloud Database Table in background
       syncProductToSupabase(newProduct).catch(err => console.warn('Sync error:', err));
 
       return res.status(201).json(newProduct);
@@ -564,17 +678,48 @@ const PORT = 3000;
   app.put('/api/admin/products/:id', requireAdmin, async (req, res) => {
     try {
       const db = DB.get();
-      const index = db.products.findIndex(p => p.id === req.params.id);
+      const targetId = req.params.id;
+      let index = db.products.findIndex(p => String(p.id) === String(targetId) || p.slug === targetId || (req.body.slug && p.slug === req.body.slug));
+
       if (index === -1) {
-        return res.status(404).json({ error: 'Product not found' });
+        // Upsert if not found
+        const newProduct: Product = {
+          id: targetId || 'prod-' + Date.now(),
+          categoryId: req.body.categoryId || (db.categories[0]?.id || 'cat-unisex'),
+          name: req.body.name || 'New Product',
+          slug: req.body.slug || ('product-' + Date.now()),
+          sku: req.body.sku || ('CMF-' + Date.now()),
+          description: req.body.description || '',
+          price: Number(req.body.price) || 0,
+          salePrice: req.body.salePrice ? Number(req.body.salePrice) : null,
+          sizes: req.body.sizes || ['S', 'M', 'L'],
+          colors: req.body.colors || [{ name: 'Black', hex: '#111111' }],
+          stockQuantity: Number(req.body.stockQuantity) || 0,
+          mainImage: req.body.mainImage || '',
+          galleryImages: req.body.galleryImages || [req.body.mainImage],
+          fabricDetails: req.body.fabricDetails || '',
+          careInstructions: req.body.careInstructions || '',
+          featured: !!req.body.featured,
+          isNewArrival: !!req.body.isNewArrival,
+          views: 0,
+          status: req.body.status || 'active',
+          createdAt: new Date().toISOString()
+        };
+        db.products.unshift(newProduct);
+        DB.save();
+        syncProductToSupabase(newProduct).catch(err => console.warn('Sync error:', err));
+        return res.json(newProduct);
       }
 
-      const updated = {
-        ...db.products[index],
+      const existing = db.products[index];
+      const updated: Product = {
+        ...existing,
         ...req.body,
-        price: Number(req.body.price),
-        salePrice: req.body.salePrice ? Number(req.body.salePrice) : null,
-        stockQuantity: Number(req.body.stockQuantity),
+        price: Number(req.body.price !== undefined ? req.body.price : existing.price),
+        salePrice: req.body.salePrice !== undefined ? (req.body.salePrice ? Number(req.body.salePrice) : null) : existing.salePrice,
+        stockQuantity: Number(req.body.stockQuantity !== undefined ? req.body.stockQuantity : existing.stockQuantity),
+        mainImage: req.body.mainImage || existing.mainImage,
+        galleryImages: Array.isArray(req.body.galleryImages) && req.body.galleryImages.length > 0 ? req.body.galleryImages : (req.body.mainImage ? [req.body.mainImage] : existing.galleryImages),
       };
 
       if (updated.stockQuantity > 0 && updated.status === 'out_of_stock') {
@@ -599,14 +744,14 @@ const PORT = 3000;
   app.delete('/api/admin/products/:id', requireAdmin, async (req, res) => {
     try {
       const db = DB.get();
-      const index = db.products.findIndex(p => p.id === req.params.id);
-      if (index === -1) {
-        return res.status(404).json({ error: 'Product not found' });
+      const targetId = req.params.id;
+      const index = db.products.findIndex(p => String(p.id) === String(targetId) || p.slug === targetId);
+      if (index !== -1) {
+        db.products.splice(index, 1);
+        DB.save();
       }
-      db.products.splice(index, 1);
-      DB.save();
 
-      deleteProductFromSupabase(req.params.id).catch(err => console.warn('Delete error:', err));
+      deleteProductFromSupabase(targetId).catch(err => console.warn('Delete error:', err));
 
       return res.json({ message: 'Product deleted permanently' });
     } catch (err: any) {

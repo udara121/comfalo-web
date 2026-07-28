@@ -69,7 +69,7 @@ export default function Account() {
           'x-user-id': user.id
         }
       });
-      if (res.ok) {
+      if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
         const data = await res.json();
         setOrders(data);
       }

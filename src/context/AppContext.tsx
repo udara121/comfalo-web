@@ -92,13 +92,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setLoadingSettings(true);
       
       const settingsRes = await fetch('/api/settings');
-      if (settingsRes.ok) {
+      if (settingsRes.ok && settingsRes.headers.get('content-type')?.includes('application/json')) {
         const data = await settingsRes.json();
         setSettings(data);
       }
 
       const categoriesRes = await fetch('/api/categories');
-      if (categoriesRes.ok) {
+      if (categoriesRes.ok && categoriesRes.headers.get('content-type')?.includes('application/json')) {
         const data = await categoriesRes.json();
         if (Array.isArray(data) && data.length > 0) {
           setCategories(data);
@@ -119,7 +119,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const fetchSettings = async () => {
     try {
       const settingsRes = await fetch('/api/settings');
-      if (settingsRes.ok) {
+      if (settingsRes.ok && settingsRes.headers.get('content-type')?.includes('application/json')) {
         const data = await settingsRes.json();
         setSettings(data);
       }

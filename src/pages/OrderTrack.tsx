@@ -41,10 +41,13 @@ export default function OrderTrack() {
 
       const url = `/api/orders/track?number=${encodeURIComponent(num.trim())}&phone=${encodeURIComponent(ph.trim())}`;
       const res = await fetch(url);
-      const data = await res.json();
+      let data: any = {};
+      if (res.headers.get('content-type')?.includes('application/json')) {
+        data = await res.json();
+      }
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to locate order. Please check values.');
+        throw new Error(data.error || 'No matching order located. Please check values.');
       }
 
       setOrder(data);

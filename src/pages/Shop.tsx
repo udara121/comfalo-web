@@ -67,7 +67,7 @@ export default function Shop() {
         }
 
         const res = await fetch(url);
-        if (res.ok) {
+        if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
             setProducts(data);

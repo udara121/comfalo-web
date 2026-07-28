@@ -14,6 +14,14 @@ const PORT = 3000;
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+  // Normalize req.url for Vercel serverless rewrites (ensures both /api/* and /* match)
+  app.use((req, res, next) => {
+    if (req.url && !req.url.startsWith('/api')) {
+      req.url = '/api' + (req.url.startsWith('/') ? req.url : '/' + req.url);
+    }
+    next();
+  });
+
   // Simple Session Authorization Middleware (Checks token/user-id passed via headers)
   const authenticateUser = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const userId = req.headers['x-user-id'] as string;

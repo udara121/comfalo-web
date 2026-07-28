@@ -33,9 +33,10 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-40 bg-[#FAFAFA]/95 backdrop-blur-md border-b border-gray-100 font-sans" id="comfalo-header">
       {/* Announcement Bar */}
-      <div className="bg-[#111111] text-white text-[9px] sm:text-[11px] tracking-[0.15em] py-2 px-3 text-center font-medium uppercase overflow-hidden whitespace-nowrap">
+      <div className="bg-[#111111] text-white text-[10px] sm:text-[11px] tracking-[0.15em] py-2 px-3 text-center font-medium uppercase overflow-hidden whitespace-nowrap">
         <div className="animate-marquee inline-block">
-          ⚡ FREE ISLANDWIDE DELIVERY FOR ORDERS ABOVE RS. 7,500 • COD & WHATSAPP ORDERS ACCEPTED • 2–4 WORKING DAYS ESTIMATED DELIVERY ⚡
+          <span className="mx-4">⚡ FREE ISLANDWIDE DELIVERY FOR ORDERS ABOVE RS. 7,500 • COD & WHATSAPP ORDERS ACCEPTED • 2–4 WORKING DAYS ESTIMATED DELIVERY ⚡</span>
+          <span className="mx-4">⚡ FREE ISLANDWIDE DELIVERY FOR ORDERS ABOVE RS. 7,500 • COD & WHATSAPP ORDERS ACCEPTED • 2–4 WORKING DAYS ESTIMATED DELIVERY ⚡</span>
         </div>
       </div>
 

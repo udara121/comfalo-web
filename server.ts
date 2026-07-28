@@ -14,35 +14,47 @@ const PORT = 3000;
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+  // Vercel Serverless URL rewrite normalizer (ensures /admin/... rewrites match /api/admin/...)
+  app.use((req, res, next) => {
+    if (req.url && !req.url.startsWith('/api') && (req.url.startsWith('/admin') || req.url.startsWith('/products') || req.url.startsWith('/categories') || req.url.startsWith('/banners') || req.url.startsWith('/settings') || req.url.startsWith('/orders') || req.url.startsWith('/auth'))) {
+      req.url = '/api' + req.url;
+    }
+    next();
+  });
+
   // Simple Session Authorization Middleware (Checks token/user-id passed via headers)
   const authenticateUser = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const userId = req.headers['x-user-id'] as string;
-    if (!userId) {
-      return res.status(418).json({ error: 'Unauthorized: Missing session headers' });
+    try {
+      const userId = req.headers['x-user-id'] as string;
+      if (!userId) {
+        return res.status(418).json({ error: 'Unauthorized: Missing session headers' });
+      }
+      const db = DB.get();
+      let user = db.users.find(u => u.id === userId);
+      if (!user && (userId === 'user-admin' || userId.includes('admin'))) {
+        user = {
+          id: 'user-admin',
+          fullName: 'Comfalo Admin',
+          email: 'admin@comfalo.lk',
+          password: '',
+          phone: '+94771234567',
+          whatsapp: '94771234567',
+          address: 'No 45, Flower Road',
+          city: 'Colombo 07',
+          district: 'Colombo',
+          userType: 'admin',
+          status: 'active',
+          createdAt: new Date().toISOString(),
+        };
+      }
+      if (!user) {
+        return res.status(401).json({ error: 'Unauthorized: User not found' });
+      }
+      (req as any).user = user;
+      next();
+    } catch (err: any) {
+      return res.status(500).json({ error: err?.message || 'Authentication error' });
     }
-    const db = DB.get();
-    let user = db.users.find(u => u.id === userId);
-    if (!user && (userId === 'user-admin' || userId.includes('admin'))) {
-      user = {
-        id: 'user-admin',
-        fullName: 'Comfalo Admin',
-        email: 'admin@comfalo.lk',
-        password: '',
-        phone: '+94771234567',
-        whatsapp: '94771234567',
-        address: 'No 45, Flower Road',
-        city: 'Colombo 07',
-        district: 'Colombo',
-        userType: 'admin',
-        status: 'active',
-        createdAt: new Date().toISOString(),
-      };
-    }
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized: User not found' });
-    }
-    (req as any).user = user;
-    next();
   };
 
   const requireAdmin = (req: express.Request, res: express.Response, next: express.NextFunction) => {

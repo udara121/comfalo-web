@@ -8,7 +8,7 @@ import { ChevronLeft, ChevronRight, ArrowRight, Truck, PhoneCall, RotateCcw, Shi
 
 export default function Home() {
   const { navigateTo, categories } = useApp();
-  const [banners, setBanners] = useState<Banner[]>([]);
+  const [banners, setBanners] = useState<Banner[]>(INITIAL_BANNERS);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [newArrivals, setNewArrivals] = useState<Product[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -167,12 +167,7 @@ export default function Home() {
     <div className="bg-[#FAFAFA]" id="comfalo-home-page">
       {/* 1. Hero Slideshow Banner (Framed to show FULL Image) */}
       <section className="relative w-full h-[65vh] sm:h-[78vh] md:h-[85vh] lg:h-[88vh] min-h-[520px] max-h-[860px] overflow-hidden bg-gray-900" id="hero-slider">
-        {loading || banners.length === 0 ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 text-white font-mono text-xs tracking-widest uppercase">
-            LOADING COLLECTION...
-          </div>
-        ) : (
-          banners.map((banner, index) => {
+        {banners.map((banner, index) => {
             const isDtfSlide = banner.title.toUpperCase().includes('STREET ACCENTS') ||
               banner.title.toUpperCase().includes('PRINTING') ||
               banner.title.toUpperCase().includes('DTF');
@@ -337,7 +332,7 @@ export default function Home() {
               </div>
             );
           })
-        )}
+        }
 
         {/* Carousel Slide controls (Hidden per user request) */}
         {banners.length > 1 && (

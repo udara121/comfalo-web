@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Product } from '../types';
+import { INITIAL_PRODUCTS } from '../data/initialData';
 import ProductCard from '../components/ProductCard';
 import { ShoppingBag, ChevronRight, MessageSquare, PhoneCall, ShieldCheck, HelpCircle, Truck, RefreshCw } from 'lucide-react';
 
@@ -34,29 +35,52 @@ export default function ProductDetail() {
       if (!productSlug) return;
       try {
         setLoading(true);
-        const res = await fetch(`/api/products/${productSlug}`);
-        if (!res.ok) {
-          throw new Error('Product not found');
-        }
-        const data = await res.json() as Product;
-        setProduct(data);
-        setActiveImage(data.mainImage);
+        let foundProduct: Product | null = null;
 
-        // Pre-select first color
-        if (data.colors && data.colors.length > 0) {
-          setSelectedColor(data.colors[0]);
+        try {
+          const res = await fetch(`/api/products/${productSlug}`);
+          if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
+            foundProduct = await res.json() as Product;
+          }
+        } catch (apiErr) {
+          console.warn('API product detail fetch error:', apiErr);
         }
-        // Reset selections on product change
-        setSelectedSize('');
-        setQuantity(1);
-        setSizeError(false);
-        setColorError(false);
 
-        // Fetch related products (same category, active, except current)
-        const productsRes = await fetch(`/api/products?category=${data.categoryId}`);
-        if (productsRes.ok) {
-          const list = await productsRes.json() as Product[];
-          setRelatedProducts(list.filter(p => p.id !== data.id).slice(0, 4));
+        // Fallback to INITIAL_PRODUCTS if API didn't find product
+        if (!foundProduct) {
+          foundProduct = INITIAL_PRODUCTS.find(p => p.slug === productSlug || p.id === productSlug || p.slug.includes(productSlug)) || null;
+        }
+
+        if (foundProduct) {
+          setProduct(foundProduct);
+          setActiveImage(foundProduct.mainImage);
+
+          if (foundProduct.colors && foundProduct.colors.length > 0) {
+            setSelectedColor(foundProduct.colors[0]);
+          }
+          setSelectedSize('');
+          setQuantity(1);
+          setSizeError(false);
+          setColorError(false);
+
+          // Fetch related products
+          try {
+            const productsRes = await fetch(`/api/products?category=${foundProduct.categoryId}`);
+            if (productsRes.ok && productsRes.headers.get('content-type')?.includes('application/json')) {
+              const list = await productsRes.json() as Product[];
+              if (Array.isArray(list) && list.length > 0) {
+                setRelatedProducts(list.filter(p => p.id !== foundProduct?.id).slice(0, 4));
+              } else {
+                setRelatedProducts(INITIAL_PRODUCTS.filter(p => p.id !== foundProduct?.id).slice(0, 4));
+              }
+            } else {
+              setRelatedProducts(INITIAL_PRODUCTS.filter(p => p.id !== foundProduct?.id).slice(0, 4));
+            }
+          } catch (relErr) {
+            setRelatedProducts(INITIAL_PRODUCTS.filter(p => p.id !== foundProduct?.id).slice(0, 4));
+          }
+        } else {
+          setProduct(null);
         }
       } catch (err) {
         console.error('Error fetching product details:', err);

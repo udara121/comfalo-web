@@ -22,6 +22,7 @@ export default function Header() {
   };
 
   const navLinks = [
+    { name: 'Home 🏠', path: '/' },
     { name: 'Men', path: '/shop?category=men' },
     { name: 'Women', path: '/shop?category=women' },
     { name: 'Unisex', path: '/shop?category=unisex' },

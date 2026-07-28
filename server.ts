@@ -455,7 +455,16 @@ const PORT = 3000;
   });
 
   // Single product detail (by slug or ID)
-  app.get('/api/products/:slug', (req, res) => {
+  app.get('/api/products/:slug', async (req, res) => {
+    try {
+      const { data, error } = await supabase.from('products').select('*').or(`slug.eq.${req.params.slug},id.eq.${req.params.slug}`).limit(1).maybeSingle();
+      if (!error && data) {
+        return res.json(mapSupabaseProduct(data));
+      }
+    } catch (e) {
+      console.warn('Supabase single product fetch warning:', e);
+    }
+
     const db = DB.get();
     const product = db.products.find(p => p.slug === req.params.slug || p.id === req.params.slug);
     if (!product) {

@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import ProductCard from '../components/ProductCard';
 import { Product, Banner } from '../types';
 import { supabase } from '../lib/supabase';
-import { INITIAL_PRODUCTS } from '../data/initialData';
+import { INITIAL_PRODUCTS, INITIAL_BANNERS } from '../data/initialData';
 import { ChevronLeft, ChevronRight, ArrowRight, Truck, PhoneCall, RotateCcw, ShieldCheck, Printer, Palette, Clock, PenTool, MessageCircle, Globe, Headphones } from 'lucide-react';
 
 export default function Home() {

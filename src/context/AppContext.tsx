@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Category, SiteSettings, Product } from '../types';
+import { INITIAL_CATEGORIES } from '../data/initialData';
 
 export interface CartItem {
   productId: string;
@@ -99,10 +100,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const categoriesRes = await fetch('/api/categories');
       if (categoriesRes.ok) {
         const data = await categoriesRes.json();
-        setCategories(data);
+        if (Array.isArray(data) && data.length > 0) {
+          setCategories(data);
+        } else {
+          setCategories(INITIAL_CATEGORIES);
+        }
+      } else {
+        setCategories(INITIAL_CATEGORIES);
       }
     } catch (e) {
       console.error('Error fetching initial settings:', e);
+      setCategories(INITIAL_CATEGORIES);
     } finally {
       setLoadingSettings(false);
     }

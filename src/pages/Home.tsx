@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import ProductCard from '../components/ProductCard';
 import { Product, Banner } from '../types';
 import { supabase } from '../lib/supabase';
+import { INITIAL_PRODUCTS } from '../data/initialData';
 import { ChevronLeft, ChevronRight, ArrowRight, Truck, PhoneCall, RotateCcw, ShieldCheck, Printer, Palette, Clock, PenTool, MessageCircle, Globe, Headphones } from 'lucide-react';
 
 export default function Home() {
@@ -109,14 +110,16 @@ export default function Home() {
           }
         }
 
-        if (loadedProducts && loadedProducts.length > 0) {
-          const activeProds = loadedProducts.filter(p => p.status === 'active');
-          const featured = activeProds.filter(p => p.featured);
-          const newProds = activeProds.filter(p => p.isNewArrival);
-
-          setFeaturedProducts(featured.length > 0 ? featured.slice(0, 4) : activeProds.slice(0, 4));
-          setNewArrivals(newProds.length > 0 ? newProds.slice(0, 4) : activeProds.slice(0, 4));
+        if (!loadedProducts || loadedProducts.length === 0) {
+          loadedProducts = INITIAL_PRODUCTS;
         }
+
+        const activeProds = loadedProducts.filter(p => p.status === 'active');
+        const featured = activeProds.filter(p => p.featured);
+        const newProds = activeProds.filter(p => p.isNewArrival);
+
+        setFeaturedProducts(featured.length > 0 ? featured.slice(0, 4) : activeProds.slice(0, 4));
+        setNewArrivals(newProds.length > 0 ? newProds.slice(0, 4) : activeProds.slice(0, 4));
       } catch (err) {
         console.error('Error fetching home page data:', err);
       } finally {

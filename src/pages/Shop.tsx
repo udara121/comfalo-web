@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import ProductCard from '../components/ProductCard';
 import { Product } from '../types';
+import { INITIAL_PRODUCTS } from '../data/initialData';
 import { SlidersHorizontal, ArrowRight, X, ChevronDown, Check } from 'lucide-react';
 
 export default function Shop() {
@@ -68,10 +69,27 @@ export default function Shop() {
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
-          setProducts(data);
+          if (Array.isArray(data) && data.length > 0) {
+            setProducts(data);
+          } else {
+            let fallbackList = INITIAL_PRODUCTS;
+            if (selectedCategory && selectedCategory !== 'all') {
+              if (selectedCategory === 'sale') {
+                fallbackList = fallbackList.filter(p => p.salePrice !== null && p.salePrice !== undefined);
+              } else if (selectedCategory === 'new-arrivals') {
+                fallbackList = fallbackList.filter(p => p.isNewArrival);
+              } else {
+                fallbackList = fallbackList.filter(p => p.categoryId === selectedCategory || p.categoryId === `cat-${selectedCategory}` || p.slug === selectedCategory);
+              }
+            }
+            setProducts(fallbackList);
+          }
+        } else {
+          setProducts(INITIAL_PRODUCTS);
         }
       } catch (err) {
         console.error('Error fetching shop products:', err);
+        setProducts(INITIAL_PRODUCTS);
       } finally {
         setLoading(false);
       }

@@ -510,97 +510,109 @@ const PORT = 3000;
   };
 
   // Admin Add Product
-  app.post('/api/admin/products', requireAdmin, (req, res) => {
-    const db = DB.get();
-    const { name, slug, categoryId, sku, description, price, salePrice, sizes, colors, stockQuantity, mainImage, galleryImages, fabricDetails, careInstructions, featured, isNewArrival } = req.body;
+  app.post('/api/admin/products', requireAdmin, async (req, res) => {
+    try {
+      const db = DB.get();
+      const { name, slug, categoryId, sku, description, price, salePrice, sizes, colors, stockQuantity, mainImage, galleryImages, fabricDetails, careInstructions, featured, isNewArrival } = req.body;
 
-    if (!name || !slug || !categoryId || !price) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      if (!name || !slug || !categoryId || !price) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+
+      const exists = db.products.some(p => p.slug === slug);
+      if (exists) {
+        return res.status(400).json({ error: 'Slug must be unique' });
+      }
+
+      const newProduct: Product = {
+        id: 'prod-' + Date.now(),
+        categoryId,
+        name,
+        slug,
+        sku: sku || 'CMF-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
+        description: description || '',
+        price: Number(price),
+        salePrice: salePrice ? Number(salePrice) : null,
+        sizes: Array.isArray(sizes) ? sizes : ['S', 'M', 'L', 'XL'],
+        colors: Array.isArray(colors) ? colors : [{ name: 'Black', hex: '#111111' }],
+        stockQuantity: Number(stockQuantity) || 0,
+        mainImage: mainImage || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800',
+        galleryImages: Array.isArray(galleryImages) ? galleryImages : [mainImage],
+        fabricDetails: fabricDetails || '',
+        careInstructions: careInstructions || '',
+        featured: !!featured,
+        isNewArrival: !!isNewArrival,
+        views: 0,
+        status: Number(stockQuantity) > 0 ? 'active' : 'out_of_stock',
+        createdAt: new Date().toISOString(),
+      };
+
+      db.products.push(newProduct);
+      DB.save();
+
+      // Live Sync with Supabase Cloud Database Table in background
+      syncProductToSupabase(newProduct).catch(err => console.warn('Sync error:', err));
+
+      return res.status(201).json(newProduct);
+    } catch (err: any) {
+      console.error('Error adding product:', err);
+      return res.status(500).json({ error: err?.message || 'Failed to add product' });
     }
-
-    const exists = db.products.some(p => p.slug === slug);
-    if (exists) {
-      return res.status(400).json({ error: 'Slug must be unique' });
-    }
-
-    const newProduct: Product = {
-      id: 'prod-' + Date.now(),
-      categoryId,
-      name,
-      slug,
-      sku: sku || 'CMF-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
-      description: description || '',
-      price: Number(price),
-      salePrice: salePrice ? Number(salePrice) : null,
-      sizes: Array.isArray(sizes) ? sizes : ['S', 'M', 'L', 'XL'],
-      colors: Array.isArray(colors) ? colors : [{ name: 'Black', hex: '#111111' }],
-      stockQuantity: Number(stockQuantity) || 0,
-      mainImage: mainImage || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800',
-      galleryImages: Array.isArray(galleryImages) ? galleryImages : [mainImage],
-      fabricDetails: fabricDetails || '',
-      careInstructions: careInstructions || '',
-      featured: !!featured,
-      isNewArrival: !!isNewArrival,
-      views: 0,
-      status: Number(stockQuantity) > 0 ? 'active' : 'out_of_stock',
-      createdAt: new Date().toISOString(),
-    };
-
-    db.products.push(newProduct);
-    DB.save();
-
-    // Live Sync with Supabase Cloud Database Table in background
-    syncProductToSupabase(newProduct).catch(err => console.warn('Sync error:', err));
-
-    res.status(201).json(newProduct);
   });
 
   // Admin Edit Product
-  app.put('/api/admin/products/:id', requireAdmin, (req, res) => {
-    const db = DB.get();
-    const index = db.products.findIndex(p => p.id === req.params.id);
-    if (index === -1) {
-      return res.status(404).json({ error: 'Product not found' });
+  app.put('/api/admin/products/:id', requireAdmin, async (req, res) => {
+    try {
+      const db = DB.get();
+      const index = db.products.findIndex(p => p.id === req.params.id);
+      if (index === -1) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+
+      const updated = {
+        ...db.products[index],
+        ...req.body,
+        price: Number(req.body.price),
+        salePrice: req.body.salePrice ? Number(req.body.salePrice) : null,
+        stockQuantity: Number(req.body.stockQuantity),
+      };
+
+      if (updated.stockQuantity > 0 && updated.status === 'out_of_stock') {
+        updated.status = 'active';
+      } else if (updated.stockQuantity <= 0) {
+        updated.status = 'out_of_stock';
+      }
+
+      db.products[index] = updated;
+      DB.save();
+
+      syncProductToSupabase(updated).catch(err => console.warn('Sync error:', err));
+
+      return res.json(updated);
+    } catch (err: any) {
+      console.error('Error updating product:', err);
+      return res.status(500).json({ error: err?.message || 'Failed to update product' });
     }
-
-    const updated = {
-      ...db.products[index],
-      ...req.body,
-      price: Number(req.body.price),
-      salePrice: req.body.salePrice ? Number(req.body.salePrice) : null,
-      stockQuantity: Number(req.body.stockQuantity),
-    };
-
-    // Auto update status if stock changes
-    if (updated.stockQuantity > 0 && updated.status === 'out_of_stock') {
-      updated.status = 'active';
-    } else if (updated.stockQuantity <= 0) {
-      updated.status = 'out_of_stock';
-    }
-
-    db.products[index] = updated;
-    DB.save();
-
-    // Live Sync with Supabase Cloud Database Table in background
-    syncProductToSupabase(updated).catch(err => console.warn('Sync error:', err));
-
-    res.json(updated);
   });
 
   // Admin Delete Product
-  app.delete('/api/admin/products/:id', requireAdmin, (req, res) => {
-    const db = DB.get();
-    const index = db.products.findIndex(p => p.id === req.params.id);
-    if (index === -1) {
-      return res.status(404).json({ error: 'Product not found' });
+  app.delete('/api/admin/products/:id', requireAdmin, async (req, res) => {
+    try {
+      const db = DB.get();
+      const index = db.products.findIndex(p => p.id === req.params.id);
+      if (index === -1) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+      db.products.splice(index, 1);
+      DB.save();
+
+      deleteProductFromSupabase(req.params.id).catch(err => console.warn('Delete error:', err));
+
+      return res.json({ message: 'Product deleted permanently' });
+    } catch (err: any) {
+      console.error('Error deleting product:', err);
+      return res.status(500).json({ error: err?.message || 'Failed to delete product' });
     }
-    db.products.splice(index, 1);
-    DB.save();
-
-    // Live Delete from Supabase Cloud Database Table in background
-    deleteProductFromSupabase(req.params.id).catch(err => console.warn('Delete error:', err));
-
-    res.json({ message: 'Product deleted permanently' });
   });
 
   // Order Placement

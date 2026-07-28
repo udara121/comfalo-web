@@ -113,6 +113,47 @@ export default function Admin() {
     setTimeout(() => setNotifyMsg({ type: '', text: '' }), 6000);
   };
 
+  const compressImageFile = (file: File, maxWidth = 1000, maxHeight = 1000, quality = 0.75): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const rawBase64 = event.target?.result as string;
+        const img = new Image();
+        img.src = rawBase64;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(rawBase64);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = () => resolve(rawBase64);
+      };
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, targetField: 'product' | 'banner' = 'product') => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -120,45 +161,40 @@ export default function Admin() {
     try {
       setUploadingImage(true);
 
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const base64Url = event.target?.result as string;
+      // 1. Try uploading to Supabase Storage first
+      try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+        const filePath = `products/${fileName}`;
 
-        // Try uploading to Supabase Storage first
-        try {
-          const fileExt = file.name.split('.').pop();
-          const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
-          const filePath = `products/${fileName}`;
+        const { data, error } = await supabase.storage
+          .from('product-images')
+          .upload(filePath, file, { cacheControl: '3600', upsert: true });
 
-          const { data, error } = await supabase.storage
+        if (!error) {
+          const { data: publicUrlData } = supabase.storage
             .from('product-images')
-            .upload(filePath, file, { cacheControl: '3600', upsert: true });
+            .getPublicUrl(filePath);
 
-          if (!error) {
-            const { data: publicUrlData } = supabase.storage
-              .from('product-images')
-              .getPublicUrl(filePath);
-
-            if (publicUrlData?.publicUrl) {
-              if (targetField === 'product') setProdMainImage(publicUrlData.publicUrl);
-              else setBanImage(publicUrlData.publicUrl);
-              showNotify('success', 'Image successfully uploaded to Supabase Storage!');
-              setUploadingImage(false);
-              return;
-            }
+          if (publicUrlData?.publicUrl) {
+            if (targetField === 'product') setProdMainImage(publicUrlData.publicUrl);
+            else setBanImage(publicUrlData.publicUrl);
+            showNotify('success', 'Image successfully uploaded to Supabase Storage!');
+            setUploadingImage(false);
+            return;
           }
-        } catch (storageErr) {
-          console.warn('Supabase storage upload fallback:', storageErr);
         }
+      } catch (storageErr) {
+        console.warn('Supabase storage upload fallback:', storageErr);
+      }
 
-        // Fallback to instant Base64 Image URL
-        if (targetField === 'product') setProdMainImage(base64Url);
-        else setBanImage(base64Url);
-        showNotify('success', 'Image file selected & attached successfully!');
-        setUploadingImage(false);
-      };
+      // 2. Fallback: Compress image to small JPEG Base64 (<200KB) to ensure it never exceeds Vercel payload limits
+      const compressedBase64 = await compressImageFile(file);
+      if (targetField === 'product') setProdMainImage(compressedBase64);
+      else setBanImage(compressedBase64);
 
-      reader.readAsDataURL(file);
+      showNotify('success', 'Image selected & compressed successfully!');
+      setUploadingImage(false);
     } catch (err: any) {
       console.error('File upload exception:', err);
       showNotify('error', `Upload Failed: ${err.message || err}`);

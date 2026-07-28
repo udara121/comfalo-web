@@ -571,30 +571,51 @@ const INITIAL_ORDER_ITEMS: OrderItem[] = [
   }
 ];
 
+const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL_ENV;
+const READ_ONLY_DB_FILE = path.join(process.cwd(), 'data', 'db.json');
+const WRITABLE_DB_FILE = isVercel ? path.join('/tmp', 'db.json') : READ_ONLY_DB_FILE;
+
 export class DB {
   private static data: DatabaseSchema | null = null;
 
   public static init() {
     if (this.data) return;
 
-    const dataDir = path.join(process.cwd(), 'data');
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
+    try {
+      // On Vercel, copy initial db.json to /tmp/db.json if /tmp/db.json does not exist
+      if (isVercel && !fs.existsSync(WRITABLE_DB_FILE)) {
+        if (fs.existsSync(READ_ONLY_DB_FILE)) {
+          try {
+            const rawSeed = fs.readFileSync(READ_ONLY_DB_FILE, 'utf-8');
+            fs.writeFileSync(WRITABLE_DB_FILE, rawSeed, 'utf-8');
+          } catch (e) {
+            console.warn('Could not copy read-only db.json to /tmp:', e);
+          }
+        }
+      }
 
-    if (fs.existsSync(DB_FILE)) {
-      try {
-        const raw = fs.readFileSync(DB_FILE, 'utf-8');
+      if (!isVercel) {
+        const dataDir = path.join(process.cwd(), 'data');
+        if (!fs.existsSync(dataDir)) {
+          fs.mkdirSync(dataDir, { recursive: true });
+        }
+      }
+
+      const targetFile = fs.existsSync(WRITABLE_DB_FILE)
+        ? WRITABLE_DB_FILE
+        : (fs.existsSync(READ_ONLY_DB_FILE) ? READ_ONLY_DB_FILE : null);
+
+      if (targetFile && fs.existsSync(targetFile)) {
+        const raw = fs.readFileSync(targetFile, 'utf-8');
         this.data = JSON.parse(raw);
-        // Ensure structure is correct
         if (!this.data?.users || !this.data?.products) {
           throw new Error('Malformed database file');
         }
-      } catch (err) {
-        console.error('Error reading DB, re-seeding...', err);
+      } else {
         this.seed();
       }
-    } else {
+    } catch (err) {
+      console.error('Error initializing DB, re-seeding...', err);
       this.seed();
     }
   }
@@ -615,7 +636,8 @@ export class DB {
   public static save() {
     if (!this.data) return;
     try {
-      fs.writeFileSync(DB_FILE, JSON.stringify(this.data, null, 2), 'utf-8');
+      const targetPath = isVercel ? WRITABLE_DB_FILE : READ_ONLY_DB_FILE;
+      fs.writeFileSync(targetPath, JSON.stringify(this.data, null, 2), 'utf-8');
     } catch (err) {
       console.error('Failed to save database:', err);
     }

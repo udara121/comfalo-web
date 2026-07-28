@@ -807,6 +807,12 @@ const PORT = 3000;
     res.json({ message: `Customer status updated to ${customer.status}`, status: customer.status });
   });
 
+  // Global Error Handler Middleware to ensure clean JSON responses instead of HTML 500 pages
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error('Express API Error:', err);
+    res.status(500).json({ error: err?.message || 'Internal Server Error' });
+  });
+
 // Static serving for build output and Vite Dev Middleware (Local Server Only)
 if (process.env.VERCEL !== '1' && !process.env.VERCEL_ENV) {
   async function startLocalServer() {
